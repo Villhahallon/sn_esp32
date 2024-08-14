@@ -35,7 +35,7 @@ class Register {
 
 class Pump {
     public:
-    #define PUMP_MODES_COUNT 5 //Maximum number of pumps supported.
+    #define PUMP_MODES_COUNT 3 //Maximum number of pumps supported.
         static const char *pump_modes[PUMP_MODES_COUNT];  // Off = 0, On = 1, Auto = 4
 
         void initialise(bool installed, bool autoOperation);
@@ -87,7 +87,7 @@ class SpaNetController {
 
         Light lights;
 
-        enum heat_pump_modes {automatic=0, heat=1, cool=2, off=3};
+        enum heat_pump_modes {automatic=0, heat=1, off=3};
         
         float   getAmps();
         int     getVolts();

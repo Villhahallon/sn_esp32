@@ -47,6 +47,8 @@ class MQTT {
     String server;
     String port;
     String baseTopic;
+    String username;
+    String password;
 };
 
 MQTT mqtt;
@@ -85,7 +87,8 @@ void checkButton(){
       if (saveConfig) {
         mqtt.server= String(custom_mqtt_server.getValue());
         mqtt.port= String(custom_mqtt_port.getValue());
-
+        mqtt.password = 943955;
+        mqtt.username = "root";
         debugI("Updating config file");
         DynamicJsonDocument json(1024);
         json["mqtt_server"] = mqtt.server;
@@ -202,15 +205,11 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     snc.setHeatPumpMode(SpaNetController::heat_pump_modes(p.toInt()));
   } else if (item == "water_temp_set_point") {
     snc.setWaterTempSetPoint(p.toFloat());
-  } else if (item == "resitive_heating") {
-    snc.setAuxHeatingEnabled(parseBool(p));
   } else if (item == "heat_pump_mode_txt") {
     if (p == "auto") {
       snc.setHeatPumpMode(SpaNetController::heat_pump_modes(SpaNetController::automatic));
     } else if (p == "heat") {
       snc.setHeatPumpMode(SpaNetController::heat_pump_modes(SpaNetController::heat));
-    } else if (p == "cool") {
-      snc.setHeatPumpMode(SpaNetController::heat_pump_modes(SpaNetController::cool));
     } else if (p == "off") {
       snc.setHeatPumpMode(SpaNetController::heat_pump_modes(SpaNetController::off));
     }
@@ -244,9 +243,6 @@ void mqttPublishStatus(SpaNetController *s) {
     case SpaNetController::heat_pump_modes(SpaNetController::heat) :
       hpModeStr = "heat";
       break;
-    case SpaNetController::heat_pump_modes(SpaNetController::cool) :
-      hpModeStr = "cool";
-      break;
     case SpaNetController::heat_pump_modes(SpaNetController::off) :
       hpModeStr = "off";
       break;
@@ -254,23 +250,12 @@ void mqttPublishStatus(SpaNetController *s) {
   mqttClient.publish((mqtt.baseTopic + "heat_pump_mode_txt/value").c_str(), hpModeStr.c_str());
   mqttClient.publish((mqtt.baseTopic + "water_temp_set_point/value").c_str(), String(snc.getWaterTempSetPoint()).c_str());
   
-  if (snc.isAuxHeatingEnabled()) {
-    resp = ON;
-  } else {
-    resp = OFF;
-  }
-
-  mqttClient.publish((mqtt.baseTopic + "resitive_heating/value").c_str(), String(snc.isAuxHeatingEnabled()).c_str());
   mqttClient.publish((mqtt.baseTopic + "water_temp/value").c_str(), String(s->getWaterTemp()).c_str());
   mqttClient.publish((mqtt.baseTopic + "heating_active/value").c_str(), String(snc.isHeatingOn()).c_str());
   mqttClient.publish((mqtt.baseTopic + "uv_ozone_active/value").c_str(), String(snc.isUVOn()).c_str());
   mqttClient.publish((mqtt.baseTopic + "sanatise_running/value").c_str(), String(snc.isSanatiseRunning()).c_str());
   mqttClient.publish((mqtt.baseTopic + "status/value").c_str(), snc.getStatus());
 
-  mqttClient.publish((mqtt.baseTopic + "total_energy/value").c_str(), String(s->getTotalEnergy()).c_str());
-  mqttClient.publish((mqtt.baseTopic + "energy_today/value").c_str(), String(s->getEnergyToday()).c_str());
-  mqttClient.publish((mqtt.baseTopic + "power_consumption/value").c_str(), String(s->getPower()).c_str());
-  
 
   for (int x = 0; x < 5;x++) {
     String pump = "pump" + String(x+1) + "_operating_mode";
@@ -403,7 +388,6 @@ void mqttClimateADPublish(DynamicJsonDocument base) {
 
   JsonArray modes = base.createNestedArray("modes");
   modes.add("off");
-  modes.add("cool");
   modes.add("heat");
   modes.add("auto");
   
@@ -442,8 +426,6 @@ void mqttHaAutoDiscovery() {
   mqttBinarySensorADPublish(haTemplate, "heating_active", "Heating Active", "");
   mqttBinarySensorADPublish(haTemplate, "uv_ozone_active", "UV/Ozone Active", "");
   mqttBinarySensorADPublish(haTemplate, "sanatise_running", "Sanatise Cycle Running", "");
-  mqttSensorADPublish(haTemplate, "hpump_amb_temp", "Heatpump Ambient Temperature", "temperature","°C");
-  mqttSensorADPublish(haTemplate, "hpump_con_temp", "Heatpump Condensor Temperature", "temperature", "°C");
   mqttSensorADPublish(haTemplate, "water_temp", "Water Temperature", "temperature", "°C");  //Publish this as a sensor as well as HVAC so as to allow eaiser trending
   mqttLightsADPublish(haTemplate, "lights", "Lights");
   mqttClimateADPublish(haTemplate);
@@ -452,19 +434,19 @@ void mqttHaAutoDiscovery() {
   mqttSensorADPublish(haTemplate, "energy_today", "Energy Today", "energy", "total_increasing", "kWh");
   mqttSensorADPublish(haTemplate, "power_consumption", "Power Consumption", "power", "W");
   
-  
-  mqttSwitchADPublish(haTemplate,"resitive_heating","Aux Resitive Heating");
 
-
-
-  for (int x = 0; x < 5; x++) {
+  for (int x = 0; x < 3; x++) {
     Pump *pump = snc.getPump(x);
+    debugA("publish pumps before is installed");
     if (pump->isInstalled()) {
       String id = "pump" + String(x+1) + "_operating_mode";
       String name = "Pump " + String(x+1);
+      debugA("publish pumps");
       if (!pump->isAutoModeSupported()){
+        debugA("publish pumps as switch");
         mqttSwitchADPublish(haTemplate, id, name);  // Pumps should not be published as switches, rather fans, so to support mutispeed pumps.
       } else {
+        debugA("publish pumps as select?");
         mqttPumpSelectADPublish(haTemplate, id, name);
       }
     }
@@ -477,7 +459,7 @@ void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
 
-  delay(200);
+  delay(100);
 
   WiFi.mode(WIFI_STA); 
   WiFi.begin();
@@ -493,9 +475,9 @@ void setup() {
   if (LittleFS.begin()){
     debugI("Mounted FS");
     debugI("Reading config file");
-    File configFile = LittleFS.open("/config.json","r");
+    File configFile = LittleFS.open("config.json","r");
     if (configFile) {
-      debugI("Reading config file");
+      debugI("Reading config file",configFile);
       size_t size = configFile.size();
       // Allocate a buffer to store contents of the file.
       std::unique_ptr<char[]> buf(new char[size]);
@@ -518,16 +500,19 @@ void setup() {
   }
   
   if (mqtt.server == "") { 
-    mqtt.server = "mqtt"; 
+    mqtt.server = "192.168.1.241"; 
+    mqtt.password = 943955;
+    mqtt.username = "root";
+    debugW("Setting default MQTT server");
   }
   if (mqtt.port == "") { 
     mqtt.port = "1883"; 
+    debugW("Setting default MQTT port");
   }
 
   String snum = String(snc.getSerialNo());
 
   mqtt.baseTopic = "sn_esp32/" + snum + "/"; 
-
   mqttClient.setServer(mqtt.server.c_str(),mqtt.port.toInt());
   mqttClient.setCallback(mqttCallback);
   mqttClient.setBufferSize(2048);
@@ -545,7 +530,6 @@ void loop() {
   led.tick();
 
   snc.tick();
-
   if (!sncFirstInit && snc.initialised()) {
     mqtt.baseTopic = "sn_esp32/" + snc.getSerialNo() + "/";
     sncFirstInit = true;
@@ -558,14 +542,14 @@ void loop() {
 
   if (WiFi.status() == WL_CONNECTED) {
     if (snc.initialised()){
+      //debugA("snc");
       if (!mqttClient.connected()) {
         long now=millis();
         if (now - mqttLastConnect > 5000) {
-          led.setInterval(500);
+          led.setInterval(100);
           debugW("MQTT not connected, attempting connection to %s:%s",mqtt.server.c_str(),mqtt.port.c_str());
           mqttLastConnect = now;
-          if (mqttClient.connect("sn_esp32", (mqtt.baseTopic+"available").c_str(),2,true,"offline")) {
-            debugI("MQTT connected");
+          if (mqttClient.connect("sn_esp32", "root", "943955", (mqtt.baseTopic+"available").c_str(),2,true,"offline")) {
             mqttClient.subscribe((mqtt.baseTopic+"+/set").c_str());
             mqttClient.publish((mqtt.baseTopic+"available").c_str(),"online",true);
             autoDiscoveryPublished = false;
@@ -575,6 +559,7 @@ void loop() {
         }
       } else {
         if (!autoDiscoveryPublished) {
+          debugA("Publishing MQTT auto discovery");
           mqttHaAutoDiscovery();
           autoDiscoveryPublished = true;
           snc.forceUpdate();

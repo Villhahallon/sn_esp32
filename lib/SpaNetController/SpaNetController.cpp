@@ -22,25 +22,24 @@ Register::Register(int req) {
 }
 
 bool Register::updateRegister(const char update[]) {
-
   strcpy(reg, update);
-  int len=strlen(reg);
-  int y=1;
-  element[0]=&reg[0];
-  for(int x=0; x<len; x++) {        //split the string into a number of smaller strings
-    if (reg[x]==',') {              //each terminated by 0x0. create a pointer to the 
-      reg[x]=0;                     //start of each smaller string.
-      element[y]=&reg[x+1];
+  int len = strlen(reg);
+  int y = 0;
+  element[0] = &reg[0];
+  for (int x = 0; x < len; x++) {
+    if (reg[x] == ',') {
+      reg[x] = 0; // create a null-terminated string
+      element[y + 1] = &reg[x + 1]; // increment pointer to next field
       y++;
-      }
+    }
   }
 
-  if (y==requiredFields) {
+  if (y == requiredFields) {
     valid = true;
   } else {
-    debugW("Error parsing register, expected %d fields, got %d",requiredFields,y);
-    debugD("Update register request - %s",update);
-    valid = false;
+    //debugW("Error parsing register, expected %d fields, got %d", requiredFields, y);
+    //debugD("Update register request - %s", update);
+    valid = true;
   }
 
   return valid;
@@ -56,7 +55,7 @@ bool Register::isValid() {
 
 
 // *** Pump
-const char *Pump::pump_modes[5] = {"Off", "On", "", "", "Auto"};
+const char *Pump::pump_modes[3] = {"Off", "On", "Auto"};
 
 void Pump::initialise(bool installed, bool autoOperation) {
   _installed = installed;
@@ -137,7 +136,7 @@ bool SpaNetController::setWaterTempSetPoint(float temp){
 
 bool SpaNetController::setPumpOperating(int pump,int mode){
   debugD("pump=%d,mode=%d", pump, mode);
-  String cmd = "S"+String(pump+21)+":" + String(mode);
+  String cmd = "R"+String(pump+21)+":" + String(mode);
   queueCommand(cmd);
   return true;
 }
@@ -191,27 +190,6 @@ bool SpaNetController::setHeatPumpMode(SpaNetController::heat_pump_modes mode){
   return true;
 }
 
-bool SpaNetController::isAuxHeatingEnabled(){
-  return auxHeatElement;
-}
-
-bool SpaNetController::setAuxHeatingEnabled(bool enabled){
-  String cmd;
-  if (enabled) {
-    cmd="W98:1";
-  } else {
-    cmd="W98:0";
-  }
-  queueCommand(cmd);
-  return true;
-}
-
-
-float SpaNetController::getPower() { return instEnergy; }
-float SpaNetController::getTotalEnergy() { return totalPower; }
-float SpaNetController::getEnergyToday() { return powerToday; }
-
-
 bool SpaNetController::isHeatingOn() {
   return heatingActive;
 }
@@ -255,6 +233,18 @@ bool SpaNetController::parseStatus(String str) {
 //returned.
 
   debugD("Parsing status string");
+  debugD("serialNo: %s", String(registers[2].getField(9)) );
+  debugD("Status: %s", String(registers[2].getField(21)));
+  debugD("amps: %s", String(registers[1].getField(2)) );
+  debugD("volts: %s", String(registers[1].getField(3)) );
+  debugD("waterTemperature /10: %s", String(registers[4].getField(16)) );
+  debugD("heaterPumpMode: %s", String(registers[6].getField(27)) );
+  debugD("uvActive: %s", String(registers[4].getField(12)) );
+  debugD("sanatiseActive: %s",  String(registers[4].getField(17)) );
+  debugD("heater_temperature /10: %s", String(registers[1].getField(13)) );
+  debugD("heaterActive: %s", String(registers[4].getField(13)) );
+  debugD("setWaterTempSetPoint: %s", String(registers[5].getField(9)) );
+  debugD("pumpsActive: %s", String(registers[4].getField(24)) );
 
   int currentPos = 0;
   int colonIndex = str.indexOf(':');
@@ -266,8 +256,8 @@ bool SpaNetController::parseStatus(String str) {
     if (r>-1){
       int currentReg = -1;
       char rChar = str.charAt(r+1); //should really check if r is the last character of string
-      if (rChar=='F') { currentReg = 0; }
-      else if (rChar=='2') { currentReg = 1; }
+      /* if (rChar=='F') { currentReg = 0; }
+      else */ if (rChar=='2') { currentReg = 1; }
       else if (rChar=='3') { currentReg = 2; }
       else if (rChar=='4') { currentReg = 3; }
       else if (rChar=='5') { currentReg = 4; }
@@ -278,7 +268,7 @@ bool SpaNetController::parseStatus(String str) {
       else if (rChar=='B') { currentReg = 9; }
       else if (rChar=='C') { currentReg = 10; }
       else if (rChar=='E') { currentReg = 11; }
-      else if (rChar=='G') { currentReg = 12; }
+      //else if (rChar=='G') { currentReg = 12; }
       if (currentReg>-1) {
         !registers[currentReg].updateRegister(str.substring(currentPos,colonIndex).c_str());
       }
@@ -296,12 +286,11 @@ bool SpaNetController::parseStatus(String str) {
     registers[6].isValid() && \
     registers[7].isValid() && \
     registers[9].isValid() && \
-    registers[11].isValid() &&\
-    registers[12].isValid();
+    registers[11].isValid();
 
   // First datapoint in registers is at array position 2
-  if (regValid)
-  {
+
+  if (regValid) {
     
     instEnergy = float(String(registers[3].getField(11)).toInt())/10;
     totalPower = float(String(registers[3].getField(12)).toInt())/100;
@@ -321,11 +310,6 @@ bool SpaNetController::parseStatus(String str) {
 
     heatPumpMode=heat_pump_modes(String(registers[6].getField(27)).toInt());
 
-    hpump_amb_temperature = String(registers[11].getField(11)).toInt();
-    hpump_con_temperature = String(registers[11].getField(12)).toInt();
-
-    auxHeatElement = bool(String(registers[6].getField(26)).toInt());
-
     heatingActive = bool(String(registers[4].getField(13)).toInt());
 
     uvActive = bool(String(registers[4].getField(12)).toInt());
@@ -333,25 +317,25 @@ bool SpaNetController::parseStatus(String str) {
     sanatiseActive = bool(String(registers[4].getField(17)).toInt());
 
     heater_temperature = float(String(registers[1].getField(13)).toInt()) / 10;
+    
+    serialNo = String(registers[2].getField(9));
 
-    for (int x = 0; x < 5; x++) {
+    for (int x = 0; x < 3; x++) {
+      debugD("pump set op mode: %s", String(registers[4].getField(19 + x)));
       pumps[x].setOperatingMode(String(registers[4].getField(19 + x)).toInt()); 
     }
 
     if (!_firstrun) { // On first read, set static variables & set initialised flag
 
       debugD("First time, setting static elements");
-      debugD("Serial number set to '%s'", registers[2].getField(9));
 
-      serialNo = String(registers[2].getField(9));
-
-      for (int x = 0; x < 5;x++) {
+      for (int x = 0; x < 3;x++) {
 
         // Itterate through string until you get to the 3rd field
         // ('-' delimiter field boundaries).  If 3rd field contains '4'
         // then the pump supports auto operation.
         bool ao = false;
-        char *s = registers[12].getField(8 + x);
+        char *s = registers[10].getField(2 + x);
         int len = strlen(s);
         int d_count = 0;
         for (int c = 0; c < len;c++){
@@ -364,12 +348,16 @@ bool SpaNetController::parseStatus(String str) {
             }
           }
         }
-
-          pumps[x].initialise(registers[12].getField(8 + x)[0] == '1', ao);
+          debugD("init pumps %s", String(registers[10].getField(2))) ;
+          pumps[x].initialise(registers[10].getField(2 + x)[0] == '1', ao);
       }
 
       _firstrun = true;
     }
+
+
+    //_firstrun = true;
+    
 
 
   }
