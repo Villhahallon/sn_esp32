@@ -1,3 +1,11 @@
+# SV2 controller support notes
+Code adpated to work with the SV2 controller, the main branch of this code was build with the SV3.
+The registers seems to be driffrent but I got most of them sorted.
+The ESP32 now sends data back to HA and temp can be set, light works well but the pump operation buttons don't send the correct command to the controller.
+This needs to be tested more.
+
+
+
 # SpaNet MQTT ESP32 bridge
 
 SpaNet serial to mqtt bridge, including HomeAssitant autodiscovery.
