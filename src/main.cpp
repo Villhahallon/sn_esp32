@@ -501,13 +501,9 @@ void setup() {
   
   if (mqtt.server == "") { 
     mqtt.server = "192.168.1.241"; 
-    mqtt.password = 943955;
-    mqtt.username = "root";
-    debugW("Setting default MQTT server");
   }
   if (mqtt.port == "") { 
     mqtt.port = "1883"; 
-    debugW("Setting default MQTT port");
   }
 
   String snum = String(snc.getSerialNo());
