@@ -47,8 +47,6 @@ class MQTT {
     String server;
     String port;
     String baseTopic;
-    String username;
-    String password;
 };
 
 MQTT mqtt;
@@ -87,8 +85,6 @@ void checkButton(){
       if (saveConfig) {
         mqtt.server= String(custom_mqtt_server.getValue());
         mqtt.port= String(custom_mqtt_port.getValue());
-        mqtt.password = 943955;
-        mqtt.username = "root";
         debugI("Updating config file");
         DynamicJsonDocument json(1024);
         json["mqtt_server"] = mqtt.server;
