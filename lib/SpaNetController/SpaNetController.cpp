@@ -157,7 +157,8 @@ bool SpaNetController::setPump1Operating(int operatingMode){
 }
 
 bool SpaNetController::setPump2Operating(int operatingMode){
-  String cmd = "S23:" + String(operatingMode);
+  //String cmd = "S23:" + String(operatingMode);
+  String cmd = "S13";
   queueCommand(cmd);
   return true;
 }
